@@ -22,7 +22,7 @@ async function handleRequest(request) {
     const jetPhotosBaseUrl = "https://www.jetphotos.com/showphotos.php";
     const jetPhotosParams = new URLSearchParams();
 
-    // Default JetPhotos requirements
+    // Base defaults
     jetPhotosParams.set('page', '1');
     jetPhotosParams.set('sort-order', '0');
     jetPhotosParams.set('keywords-contain', '3');
@@ -36,7 +36,7 @@ async function handleRequest(request) {
     jetPhotosParams.set('genre', 'all');
     jetPhotosParams.set('search-type', 'Advanced');
 
-    // Dynamically copy EVERY parameter sent from BotGhost directly to JetPhotos
+    // Dynamically absorb everything you configured in BotGhost's URL Params menu
     for (const [key, value] of params.entries()) {
         if (key === 'country') {
             jetPhotosParams.set('country-location', value);
@@ -51,30 +51,22 @@ async function handleRequest(request) {
 
     const jetPhotosUrl = `${jetPhotosBaseUrl}?${jetPhotosParams.toString()}`;
 
-    const userAgents = [
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0'
-    ];
-    const randomUserAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
-
     try {
-        // Swapped to CodeTabs proxy to get around IP bans/Cloudflare blocks
-        const proxyUrl = `https://api.codetabs.com/v1/proxy?url=${encodeURIComponent(jetPhotosUrl)}`;
+        // Using a cleaner protocol format for the wrapper to mask the cloudflare signature
+        const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(jetPhotosUrl)}`;
 
         const response = await fetch(proxyUrl, {
             method: 'GET',
             headers: {
-                'User-Agent': randomUserAgent,
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Cache-Control': 'max-age=0'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5'
             }
         });
 
         if (!response.ok) {
             return new Response(JSON.stringify({
-                error: `Failed to fetch source data: ${response.status} ${response.statusText}`
+                error: `Proxy layer failed: ${response.status} ${response.statusText}`
             }), {
                 status: response.status,
                 headers: { 'Content-Type': 'application/json', ...corsHeaders }
@@ -83,11 +75,10 @@ async function handleRequest(request) {
 
         const html = await response.text();
         
-        // If it returned a cloudflare challenge page instead of real data
         if (html.includes('Checking your browser') || html.includes('cloudflare')) {
             return new Response(JSON.stringify({
-                error: "Proxy IP blocked by JetPhotos Cloudflare security.",
-                suggestion: "Try running the request again or using a custom proxy domain."
+                error: "Blocked by JetPhotos anti-bot firewall.",
+                hint: "Try reducing the page range or resubmitting the request."
             }), {
                 status: 403,
                 headers: { 'Content-Type': 'application/json', ...corsHeaders }
@@ -294,7 +285,7 @@ async function handleRequest(request) {
 
     } catch (error) {
         return new Response(JSON.stringify({
-            error: 'Internal API Proxy Error',
+            error: 'Scraper execution error',
             details: error.message
         }), {
             status: 500,
