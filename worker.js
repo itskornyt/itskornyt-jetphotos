@@ -1,6 +1,6 @@
 /**
  * JetPhotos Unofficial API Proxy (Cloudflare Worker)
- * Fixed to accept any parameters (keywords, airline, aircraft, etc.)
+ * Completely removed parameter safety checks to prevent BotGhost blocking.
  */
 
 addEventListener('fetch', event => {
@@ -24,22 +24,10 @@ async function handleRequest(request) {
     const url = new URL(request.url);
     const params = url.searchParams;
 
-    // Fixed safety check: Allow the request as long as at least ONE search filter is provided
-    const hasFilter = params.get('keywords') || params.get('airline') || params.get('aircraft') || params.get('country') || params.get('year');
-    
-    if (!hasFilter) {
-        return new Response(JSON.stringify({
-            message: "JetPhotos API Proxy is live! Please provide a search parameter like keywords, airline, or aircraft.",
-            received_params: Array.from(params.keys())
-        }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
-    }
-
     const jetPhotosBaseUrl = "https://www.jetphotos.com/showphotos.php";
     const jetPhotosParams = new URLSearchParams();
 
+    // Map whatever parameters come from BotGhost straight into JetPhotos parameters
     jetPhotosParams.set('page', params.get('page') || '1');
     jetPhotosParams.set('sort-order', params.get('sort-order') || '0');
     jetPhotosParams.set('keywords-contain', params.get('keywords-contain') || '3'); 
@@ -134,7 +122,6 @@ async function handleRequest(request) {
                     if (altText) {
                         const parts = altText.split('-').map(p => p.trim());
                         if (parts.length >= 3) {
-                            
                             this.currentPhoto.registration = parts[0];
                             this.currentPhoto.aircraftType = parts[1];
                             this.currentPhoto.airline = parts[2];
