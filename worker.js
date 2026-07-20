@@ -1,5 +1,6 @@
 /**
  * JetPhotos Unofficial API Proxy (Cloudflare Worker)
+ * Fully updated with a robust proxy to bypass 403 blocks.
  */
 
 addEventListener('fetch', event => {
@@ -23,7 +24,7 @@ async function handleRequest(request) {
     const url = new URL(request.url);
     const params = url.searchParams;
 
-    // If no keywords are provided, return a friendly message instead of letting JetPhotos 403 us
+    // Direct check to avoid sending empty requests to the source scraper
     if (!params.get('keywords')) {
         return new Response(JSON.stringify({
             message: "JetPhotos API Proxy is live! Please provide search parameters.",
@@ -56,16 +57,13 @@ async function handleRequest(request) {
     const jetPhotosUrl = `${jetPhotosBaseUrl}?${jetPhotosParams.toString()}`;
 
     try {
-        const fetchHeaders = new Headers();
-        fetchHeaders.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36');
-        fetchHeaders.set('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8');
-        fetchHeaders.set('Referer', 'https://www.jetphotos.com/');
-
-        // Using a robust proxy endpoint to mask the Cloudflare data-center IP
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(jetPhotosUrl)}`;
+        // We route through CodeTabs proxy engine to mask the Cloudflare datacenter IP address
+        const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(jetPhotosUrl)}`;
 
         const response = await fetch(proxyUrl, {
-            headers: fetchHeaders
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+            }
         });
 
         if (!response.ok) {
@@ -286,118 +284,6 @@ async function handleRequest(request) {
         }), {
             status: 500,
             headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
-    }
-}
- `https://www.jetphotos.com${this.currentLinkHref}` : 'N/A';
-                    } else if (fullText.includes('Location:')) {
-                        this.currentPhoto.location = valueToUse;
-                        this.currentPhoto.locationUrl = this.currentLinkHref ? `https://www.jetphotos.com${this.currentLinkHref}` : 'N/A';
-                    } else if (fullText.includes('Photo date:')) {
-                        this.currentPhoto.photoDate = valueToUse;
-                    } else if (fullText.includes('Uploaded:')) {
-                        this.currentPhoto.uploadedDate = valueToUse;
-                    } else if (fullText.includes('By:') || fullText.includes('Photographer:')) {
-                        this.currentPhoto.photographer = valueToUse;
-                        this.currentPhoto.photographerUrl = this.currentLinkHref ? `https://www.jetphotos.com${this.currentLinkHref}` : 'N/A';
-                    }
-                });
-            }
-
-            // Accumulates all text inside a photo detail list item
-            infoListTextAccumulator(textChunk) {
-                if (this.isInsideInfoListItem) {
-                    this.currentInfoListText += textChunk.text;
-                }
-            }
-
-            // Handler for any link (`<a>` tag) found inside the detail list item
-            linkInInfoTextElement(element) {
-                if (this.currentPhoto && this.isInsideInfoListItem) {
-                    this.currentLinkHref = element.getAttribute('href');
-                    this.currentLinkText = ''; // Reset for this link's text
-                }
-            }
-
-            // Accumulates text specifically within the link tag
-            linkTextInInfoTextAccumulator(textChunk) {
-                if (this.currentPhoto && this.isInsideInfoListItem && this.currentLinkHref) {
-                    this.currentLinkText += textChunk.text;
-                }
-            }
-
-            // Handler for the statistics elements (`.result__stat`)
-            statElement(element) {
-                if (this.currentPhoto) {
-                    this.currentStatText = '';
-                    element.onEndTag(() => {
-                        const text = this.currentStatText;
-                        const valueMatch = text.match(/\d+/);
-                        const value = valueMatch ? valueMatch[0] : '0';
-
-                        if (text.includes('Likes:')) {
-                            this.currentPhoto.likes = value;
-                        } else if (text.includes('Comments:')) {
-                            this.currentPhoto.comments = value;
-                        } else if (text.includes('Views:')) {
-                            this.currentPhoto.views = value;
-                        }
-                    });
-                }
-            }
-
-            // Accumulates text inside the stats element
-            statTextAccumulator(textChunk) {
-                if (this.currentPhoto) {
-                    this.currentStatText += textChunk.text;
-                }
-            }
-        }
-
-        const handler = new PhotoStreamHandler(photos);
-
-        // Define which HTML elements and their contents should be processed
-        await new HTMLRewriter()
-            .on('div[data-photo]', { element: handler.divElement.bind(handler) })
-            .on('img.result__photo', { element: handler.imgElement.bind(handler) })
-            .on('a.result__photoLink', { element: handler.photoLinkElement.bind(handler) })
-            .on('.result__infoListText', {
-                element: handler.infoListItemElement.bind(handler),
-                text: handler.infoListTextAccumulator.bind(handler)
-            })
-            .on('.result__infoListText a', {
-                element: handler.linkInInfoTextElement.bind(handler),
-                text: handler.linkTextInInfoTextAccumulator.bind(handler)
-            })
-            .on('.result__stat', {
-                element: handler.statElement.bind(handler),
-                text: handler.statTextAccumulator.bind(handler)
-            })
-            .transform(new Response(html))
-            .text();
-
-        // Return Final JSON Response
-        return new Response(JSON.stringify({
-            photos: photos,
-            count: photos.length
-        }), {
-            headers: {
-                'Content-Type': 'application/json',
-                ...corsHeaders
-            }
-        });
-
-    } catch (error) {
-        console.error('Worker processing error:', error);
-        return new Response(JSON.stringify({
-            error: 'Internal API Proxy Error',
-            details: error.message
-        }), {
-            status: 500,
-            headers: {
-                'Content-Type': 'application/json',
-                ...corsHeaders
-            }
         });
     }
 }
