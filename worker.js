@@ -1,8 +1,3 @@
-/**
- * JetPhotos Unofficial API Proxy (Cloudflare Worker)
- * Completely removed parameter safety checks to prevent BotGhost blocking.
- */
-
 addEventListener('fetch', event => {
     event.respondWith(handleRequest(event.request));
 });
@@ -24,13 +19,27 @@ async function handleRequest(request) {
     const url = new URL(request.url);
     const params = url.searchParams;
 
+    // Safety check block from your original code
+    if (!params.has('keywords')) {
+        return new Response(JSON.stringify({
+            response: {
+                message: "JetPhotos API Proxy is live! Please provide search parameters.",
+                example: `${url.origin}${url.pathname}?keywords=HS-THB&keywords-type=reg`
+            },
+            status: 200,
+            statusText: "OK"
+        }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+    }
+
     const jetPhotosBaseUrl = "https://www.jetphotos.com/showphotos.php";
     const jetPhotosParams = new URLSearchParams();
 
-    // Map whatever parameters come from BotGhost straight into JetPhotos parameters
     jetPhotosParams.set('page', params.get('page') || '1');
     jetPhotosParams.set('sort-order', params.get('sort-order') || '0');
-    jetPhotosParams.set('keywords-contain', params.get('keywords-contain') || '3'); 
+    jetPhotosParams.set('keywords-contain', params.get('keywords-contain') || '3');
     jetPhotosParams.set('keywords-type', params.get('keywords-type') || 'all');
     jetPhotosParams.set('keywords', params.get('keywords') || '');
     jetPhotosParams.set('aircraft', params.get('aircraft') || 'all');
@@ -46,12 +55,30 @@ async function handleRequest(request) {
 
     const jetPhotosUrl = `${jetPhotosBaseUrl}?${jetPhotosParams.toString()}`;
 
+    // Browser User-Agent rotation
+    const userAgents = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0'
+    ];
+    const randomUserAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
+
     try {
+        // Routed via the AllOrigins proxy wrapper
         const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(jetPhotosUrl)}`;
 
         const response = await fetch(proxyUrl, {
+            method: 'GET',
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+                'User-Agent': randomUserAgent,
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Cache-Control': 'max-age=0',
+                'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Sec-Fetch-User': '?1'
             }
         });
 
