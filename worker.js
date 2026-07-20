@@ -22,21 +22,32 @@ async function handleRequest(request) {
     const jetPhotosBaseUrl = "https://www.jetphotos.com/showphotos.php";
     const jetPhotosParams = new URLSearchParams();
 
-    jetPhotosParams.set('page', params.get('page') || '1');
-    jetPhotosParams.set('sort-order', params.get('sort-order') || '0');
-    jetPhotosParams.set('keywords-contain', params.get('keywords-contain') || '3');
-    jetPhotosParams.set('keywords-type', params.get('keywords-type') || 'all');
-    jetPhotosParams.set('keywords', params.get('keywords') || '');
-    jetPhotosParams.set('aircraft', params.get('aircraft') || 'all');
-    jetPhotosParams.set('airline', params.get('airline') || 'all');
-    jetPhotosParams.set('country-location', params.get('country') || 'all');
-    jetPhotosParams.set('photo-year', params.get('year') || 'all');
-    jetPhotosParams.set('photographer-group', params.get('photographer') || 'all');
-    jetPhotosParams.set('category', params.get('category') || 'all');
-    jetPhotosParams.set('width', params.get('width') || '');
-    jetPhotosParams.set('height', params.get('height') || '');
+    // Default JetPhotos requirements
+    jetPhotosParams.set('page', '1');
+    jetPhotosParams.set('sort-order', '0');
+    jetPhotosParams.set('keywords-contain', '3');
+    jetPhotosParams.set('keywords-type', 'all');
+    jetPhotosParams.set('aircraft', 'all');
+    jetPhotosParams.set('airline', 'all');
+    jetPhotosParams.set('country-location', 'all');
+    jetPhotosParams.set('photo-year', 'all');
+    jetPhotosParams.set('photographer-group', 'all');
+    jetPhotosParams.set('category', 'all');
     jetPhotosParams.set('genre', 'all');
     jetPhotosParams.set('search-type', 'Advanced');
+
+    // Dynamically copy EVERY parameter sent from BotGhost directly to JetPhotos
+    for (const [key, value] of params.entries()) {
+        if (key === 'country') {
+            jetPhotosParams.set('country-location', value);
+        } else if (key === 'year') {
+            jetPhotosParams.set('photo-year', value);
+        } else if (key === 'photographer') {
+            jetPhotosParams.set('photographer-group', value);
+        } else {
+            jetPhotosParams.set(key, value);
+        }
+    }
 
     const jetPhotosUrl = `${jetPhotosBaseUrl}?${jetPhotosParams.toString()}`;
 
@@ -48,7 +59,8 @@ async function handleRequest(request) {
     const randomUserAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
 
     try {
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(jetPhotosUrl)}`;
+        // Swapped to CodeTabs proxy to get around IP bans/Cloudflare blocks
+        const proxyUrl = `https://api.codetabs.com/v1/proxy?url=${encodeURIComponent(jetPhotosUrl)}`;
 
         const response = await fetch(proxyUrl, {
             method: 'GET',
@@ -56,12 +68,7 @@ async function handleRequest(request) {
                 'User-Agent': randomUserAgent,
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
                 'Accept-Language': 'en-US,en;q=0.9',
-                'Cache-Control': 'max-age=0',
-                'Upgrade-Insecure-Requests': '1',
-                'Sec-Fetch-Dest': 'document',
-                'Sec-Fetch-Mode': 'navigate',
-                'Sec-Fetch-Site': 'none',
-                'Sec-Fetch-User': '?1'
+                'Cache-Control': 'max-age=0'
             }
         });
 
@@ -75,6 +82,18 @@ async function handleRequest(request) {
         }
 
         const html = await response.text();
+        
+        // If it returned a cloudflare challenge page instead of real data
+        if (html.includes('Checking your browser') || html.includes('cloudflare')) {
+            return new Response(JSON.stringify({
+                error: "Proxy IP blocked by JetPhotos Cloudflare security.",
+                suggestion: "Try running the request again or using a custom proxy domain."
+            }), {
+                status: 403,
+                headers: { 'Content-Type': 'application/json', ...corsHeaders }
+            });
+        }
+
         const photos = [];
 
         class PhotoStreamHandler {
