@@ -1,6 +1,6 @@
 /**
  * JetPhotos Unofficial API Proxy (Cloudflare Worker)
- * Fully updated with a robust proxy to bypass 403 blocks.
+ * Updated with AllOrigins proxy to bypass 522 timeouts and 403 blocks.
  */
 
 addEventListener('fetch', event => {
@@ -24,7 +24,6 @@ async function handleRequest(request) {
     const url = new URL(request.url);
     const params = url.searchParams;
 
-    // Direct check to avoid sending empty requests to the source scraper
     if (!params.get('keywords')) {
         return new Response(JSON.stringify({
             message: "JetPhotos API Proxy is live! Please provide search parameters.",
@@ -57,8 +56,8 @@ async function handleRequest(request) {
     const jetPhotosUrl = `${jetPhotosBaseUrl}?${jetPhotosParams.toString()}`;
 
     try {
-        // We route through CodeTabs proxy engine to mask the Cloudflare datacenter IP address
-        const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(jetPhotosUrl)}`;
+        // Using AllOrigins raw proxy to cleanly strip away Cloudflare network blocking
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(jetPhotosUrl)}`;
 
         const response = await fetch(proxyUrl, {
             headers: {
