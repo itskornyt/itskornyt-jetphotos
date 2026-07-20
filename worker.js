@@ -36,7 +36,7 @@ async function handleRequest(request) {
     jetPhotosParams.set('genre', 'all');
     jetPhotosParams.set('search-type', 'Advanced');
 
-    // Dynamically absorb everything you configured in BotGhost's URL Params menu
+    // Dynamically absorb everything configured in BotGhost's URL Params menu
     for (const [key, value] of params.entries()) {
         if (key === 'country') {
             jetPhotosParams.set('country-location', value);
@@ -52,21 +52,25 @@ async function handleRequest(request) {
     const jetPhotosUrl = `${jetPhotosBaseUrl}?${jetPhotosParams.toString()}`;
 
     try {
-        // Using a cleaner protocol format for the wrapper to mask the cloudflare signature
-        const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(jetPhotosUrl)}`;
-
-        const response = await fetch(proxyUrl, {
+        // Fetching directly without proxy using pristine browser signature headers
+        const response = await fetch(jetPhotosUrl, {
             method: 'GET',
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Sec-Fetch-User': '?1',
+                'Upgrade-Insecure-Requests': '1',
+                'Cache-Control': 'max-age=0'
             }
         });
 
         if (!response.ok) {
             return new Response(JSON.stringify({
-                error: `Proxy layer failed: ${response.status} ${response.statusText}`
+                error: `Direct connection failed: ${response.status} ${response.statusText}`
             }), {
                 status: response.status,
                 headers: { 'Content-Type': 'application/json', ...corsHeaders }
@@ -77,8 +81,8 @@ async function handleRequest(request) {
         
         if (html.includes('Checking your browser') || html.includes('cloudflare')) {
             return new Response(JSON.stringify({
-                error: "Blocked by JetPhotos anti-bot firewall.",
-                hint: "Try reducing the page range or resubmitting the request."
+                error: "Blocked by JetPhotos Cloudflare security challenge.",
+                hint: "JetPhotos is requiring interactive browser verification."
             }), {
                 status: 403,
                 headers: { 'Content-Type': 'application/json', ...corsHeaders }
@@ -285,7 +289,7 @@ async function handleRequest(request) {
 
     } catch (error) {
         return new Response(JSON.stringify({
-            error: 'Scraper execution error',
+            error: 'Execution pipeline error',
             details: error.message
         }), {
             status: 500,
