@@ -1,6 +1,6 @@
 /**
  * JetPhotos Unofficial API Proxy (Cloudflare Worker)
- * Updated with AllOrigins proxy to bypass 522 timeouts and 403 blocks.
+ * Fixed to accept any parameters (keywords, airline, aircraft, etc.)
  */
 
 addEventListener('fetch', event => {
@@ -24,10 +24,13 @@ async function handleRequest(request) {
     const url = new URL(request.url);
     const params = url.searchParams;
 
-    if (!params.get('keywords')) {
+    // Fixed safety check: Allow the request as long as at least ONE search filter is provided
+    const hasFilter = params.get('keywords') || params.get('airline') || params.get('aircraft') || params.get('country') || params.get('year');
+    
+    if (!hasFilter) {
         return new Response(JSON.stringify({
-            message: "JetPhotos API Proxy is live! Please provide search parameters.",
-            example: `${url.origin}/?keywords=HS-THB&keywords-type=reg`
+            message: "JetPhotos API Proxy is live! Please provide a search parameter like keywords, airline, or aircraft.",
+            received_params: Array.from(params.keys())
         }), {
             status: 200,
             headers: { 'Content-Type': 'application/json', ...corsHeaders }
@@ -56,7 +59,6 @@ async function handleRequest(request) {
     const jetPhotosUrl = `${jetPhotosBaseUrl}?${jetPhotosParams.toString()}`;
 
     try {
-        // Using AllOrigins raw proxy to cleanly strip away Cloudflare network blocking
         const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(jetPhotosUrl)}`;
 
         const response = await fetch(proxyUrl, {
@@ -132,6 +134,7 @@ async function handleRequest(request) {
                     if (altText) {
                         const parts = altText.split('-').map(p => p.trim());
                         if (parts.length >= 3) {
+                            
                             this.currentPhoto.registration = parts[0];
                             this.currentPhoto.aircraftType = parts[1];
                             this.currentPhoto.airline = parts[2];
@@ -224,20 +227,17 @@ async function handleRequest(request) {
 
             statElement(element) {
                 if (this.currentPhoto) {
-                    this.currentStatText = '';
-                    element.onEndTag(() => {
-                        const text = this.currentStatText;
-                        const valueMatch = text.match(/\d+/);
-                        const value = valueMatch ? valueMatch[0] : '0';
+                    const text = this.currentStatText;
+                    const valueMatch = text.match(/\d+/);
+                    const value = valueMatch ? valueMatch[0] : '0';
 
-                        if (text.includes('Likes:')) {
-                            this.currentPhoto.likes = value;
-                        } else if (text.includes('Comments:')) {
-                            this.currentPhoto.comments = value;
-                        } else if (text.includes('Views:')) {
-                            this.currentPhoto.views = value;
-                        }
-                    });
+                    if (text.includes('Likes:')) {
+                        this.currentPhoto.likes = value;
+                    } else if (text.includes('Comments:')) {
+                        this.currentPhoto.comments = value;
+                    } else if (text.includes('Views:')) {
+                        this.currentPhoto.views = value;
+                    }
                 }
             }
 
