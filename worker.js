@@ -19,21 +19,6 @@ async function handleRequest(request) {
     const url = new URL(request.url);
     const params = url.searchParams;
 
-    // Safety check block from your original code
-    if (!params.has('keywords')) {
-        return new Response(JSON.stringify({
-            response: {
-                message: "JetPhotos API Proxy is live! Please provide search parameters.",
-                example: `${url.origin}${url.pathname}?keywords=HS-THB&keywords-type=reg`
-            },
-            status: 200,
-            statusText: "OK"
-        }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json', ...corsHeaders }
-        });
-    }
-
     const jetPhotosBaseUrl = "https://www.jetphotos.com/showphotos.php";
     const jetPhotosParams = new URLSearchParams();
 
@@ -55,7 +40,6 @@ async function handleRequest(request) {
 
     const jetPhotosUrl = `${jetPhotosBaseUrl}?${jetPhotosParams.toString()}`;
 
-    // Browser User-Agent rotation
     const userAgents = [
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
@@ -64,7 +48,6 @@ async function handleRequest(request) {
     const randomUserAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
 
     try {
-        // Routed via the AllOrigins proxy wrapper
         const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(jetPhotosUrl)}`;
 
         const response = await fetch(proxyUrl, {
